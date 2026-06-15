@@ -1,6 +1,6 @@
 # User Guide
 ## tracemyroute
-584 Project - By T.Pugh
+584 Project - By Tiffany Elizabeth
 
 ## About
 Every day we send and receive email, search for news, recipes, or directions, and browse various websites. And every time we click to search, send, or download, the results appear instantaneous but in actuality that data has taken quite a trip to get to you. Enter tracemyroute.
