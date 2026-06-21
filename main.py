@@ -28,12 +28,23 @@ import platform
 import json
 import pandas as pd
 import os
+import sys
 import datetime
 
 # import from root folder
 import source_address
 import dest_address
 from api_keys import access_token  # must contain this format: access_token = "1234567890" 
+
+#
+# pythonanywhere deployment:
+
+# change from /home/<user> to /home/<user>/mysite
+# adjust mysite to your project root!
+# Check if running on PythonAnywhere
+if 'PYTHONANYWHERE_SITE' in os.environ:
+    os.chdir("tracemyroute")
+    print("working folder is", os.getcwd(), file=sys.stderr)
 
 
 # setting up the environment
@@ -54,6 +65,7 @@ handler = ipinfo.getHandler(access_token)
 
 # setting up app.config for global access to map overlay
 app.config["CyberRisk"] = pd.read_csv("Cyber_security.csv")
+app.config["counties"] = "countries.geojson" # for political countries
 
 
 # beginning code
@@ -76,7 +88,9 @@ def display_hop_data():
         if result == False:
             return redirect(url_for("error", error_message=message))
         else:
-            return Response(stream_hop_data(destination), mimetype="text/html")
+            response = Response(stream_hop_data(destination), mimetype='text/html')
+            response.headers['X-Accel-Buffering'] = 'no' # needed for nginx (pythonanywhere)
+            return response
 
 def stream_hop_data(destination, source=False):
     '''Stream hop data. Starting with displaying destination url/IP address and source IP address.
@@ -137,7 +151,7 @@ def stream_hop_data(destination, source=False):
             hop_list.append({"ip": "* * *", "hostname": "N/A", "country": "N/A", 
                             "city": "N/A", "region": "N/A", "latitude": "N/A", "longitude": "N/A"})
             hop_count += 1
-            yield f"{hop_count}: * * *<br>"
+            yield f"{hop_count}: * * *<br>\n"
             
         else: 
             # reviewing hop details
@@ -166,7 +180,7 @@ def stream_hop_data(destination, source=False):
 
             # Yield an HTML string
             # will "print" hop data via this: Response(stream_hop_data(), mimetype='text/html')
-            yield f"{hop_count}: {hop_str}<br>"
+            yield f"{hop_count}: {hop_str}<br>\n"
     
 
     # At then end return a button that jumps to /plot map and uses hop_list to plot the map
@@ -245,14 +259,6 @@ def plot_map():
         # info from csv on cybersecurity risk
         df = app.config["CyberRisk"]
 
-        # pull political countries
-        '''If attempting to deploy on web server like pythonanywhere, 
-        download this link and remove the URL, directing to the file instead.
-        Be sure to update folium.Chloroplet(geo_data= " ") if you switch to a file.'''
-        political_countries_url = (
-            "http://geojson.xyz/naturalearth-3.3.0/ne_50m_admin_0_countries.geojson"
-        )
-
         # setting up zoom/base for map
         center_lat, center_lon, zoom_start = get_lat_long_center(hop_list)
 
@@ -265,7 +271,7 @@ def plot_map():
 
         # cyber_security risk level overlay
         folium.Choropleth(
-            geo_data=political_countries_url,
+            geo_data=app.config["counties"],
             data=df,
             columns=("Country", "CEI"),
             key_on="feature.properties.name",
